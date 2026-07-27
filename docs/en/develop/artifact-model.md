@@ -74,7 +74,6 @@ Full artifact object format:
   metadata: # (optional)
     license: "" # (optional) SPDX identifier
     license-files: ["LICENSE"] # License files from the source directory
-    source-root: "subdir" # (optional) Use if the actual source root is inside a subdirectory
 ```
 
 The basic format of a `source-object`:
@@ -84,11 +83,34 @@ The basic format of a `source-object`:
   type: "url" # Download type
   # ...: Additional keys depend on the type; see below
   extract: "path/to/dir" # (optional) Override extract path; default: SOURCE_PATH/{artifact-name}
+  subdir: "src" # (optional) Subdirectory of the extracted source that contains the buildable source root
+```
+
+## Common Fields
+
+Besides the type-specific keys, every source object accepts the following optional fields:
+
+### extract
+
+- **Type**: `string` (optional)
+- **Description**: Overrides the extraction directory. Defaults to `SOURCE_PATH/{artifact-name}`.
+
+### subdir
+
+- **Type**: `string` (optional)
+- **Description**: When the buildable source root is located inside a subdirectory of the extracted archive, this field specifies that subdirectory path. The framework will use `source dir + subdir` as the working directory during the build instead of the top-level extraction directory. For example, a PIE package whose `config.m4` lives in an `ext/` subdirectory, or krb5 whose actual source root is in `src/` after extraction.
+
+```yaml
+# krb5's actual source root is in the src/ subdirectory after extraction
+source:
+  type: url
+  url: 'https://web.mit.edu/kerberos/dist/krb5/1.22/krb5-1.22.2.tar.gz'
+  subdir: src
 ```
 
 ## Metadata
 
-The `metadata` field provides supplementary information about an artifact. It supports three subfields:
+The `metadata` field provides supplementary information about an artifact. It supports two subfields:
 
 ### license
 
@@ -125,17 +147,6 @@ metadata:
 # Use a built-in license file when the source package does not include one
 metadata:
   license-files: ['@/bzip2.txt']
-```
-
-### source-root
-
-- **Type**: `string` (optional)
-- **Description**: When the actual source root is located inside a subdirectory of the extracted archive, this field specifies that subdirectory name. The framework will use this path as the working directory during the build instead of the top-level extraction directory.
-
-```yaml
-# krb5's actual source root is in the src/ subdirectory after extraction
-metadata:
-  source-root: src
 ```
 
 ## Download Types
@@ -359,6 +370,7 @@ Downloads a PHP extension from [Packagist](https://repo.packagist.org) following
 - **Required**: `repo` — Packagist package path in `vendor/package` format
 - **Optional**:
   - `extract` — override extraction directory
+  - `prefer-stable` — skip pre-release versions (default: `true`)
 
 ```yaml
 # xdebug downloaded from Packagist

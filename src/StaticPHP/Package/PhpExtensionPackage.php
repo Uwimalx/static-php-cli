@@ -59,6 +59,19 @@ class PhpExtensionPackage extends Package
         return parent::getSourceDir();
     }
 
+    /**
+     * Directory the extension is actually built in: cd'd into by phpize/configure/make.
+     * Equals getSourceDir() unless the artifact declares source.subdir (e.g. a PIE
+     * package whose config.m4 lives in an ext/ subdir).
+     */
+    public function getSourceRoot(): string
+    {
+        if ($this->getArtifact() === null) {
+            return $this->getSourceDir();
+        }
+        return parent::getSourceRoot();
+    }
+
     public function getExtensionName(): string
     {
         return str_replace('ext-', '', $this->getName());
@@ -293,7 +306,7 @@ class PhpExtensionPackage extends Package
     #[Stage]
     public function phpizeForUnix(array $env, PhpExtensionPackage $package): void
     {
-        shell()->cd($package->getSourceDir())->setEnv($env)->exec(BUILD_BIN_PATH . '/phpize');
+        shell()->cd($package->getSourceRoot())->setEnv($env)->exec(BUILD_BIN_PATH . '/phpize');
     }
 
     /**
@@ -303,7 +316,7 @@ class PhpExtensionPackage extends Package
     public function configureForUnix(array $env, PhpExtensionPackage $package): void
     {
         $phpvars = getenv('SPC_EXTRA_PHP_VARS') ?: '';
-        shell()->cd($package->getSourceDir())
+        shell()->cd($package->getSourceRoot())
             ->setEnv($env)
             ->exec(
                 './configure ' . $this->getPhpConfigureArg(SystemTarget::getTargetOS(), true) .
@@ -318,7 +331,7 @@ class PhpExtensionPackage extends Package
     #[Stage]
     public function makeForUnix(array $env, PhpExtensionPackage $package, PackageBuilder $builder): void
     {
-        shell()->cd($package->getSourceDir())
+        shell()->cd($package->getSourceRoot())
             ->setEnv($env)
             ->exec('make clean')
             ->exec("make -j{$builder->concurrency}")

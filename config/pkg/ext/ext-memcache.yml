@@ -4,7 +4,6 @@ ext-memcache:
     source:
       type: ghtar
       repo: websupport-sk/pecl-memcache
-      extract: php-src/ext/memcache
     metadata:
       license-files: [LICENSE]
       license: PHP-3.0

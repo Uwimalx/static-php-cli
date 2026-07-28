@@ -4,7 +4,6 @@ ext-brotli:
     source:
       type: ghtagtar
       repo: kjdev/php-ext-brotli
-      extract: php-src/ext/brotli
     metadata:
       license-files: [LICENSE]
       license: MIT

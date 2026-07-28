@@ -4,7 +4,6 @@ ext-imap:
     source:
       type: ghtagtar
       repo: php/pecl-mail-imap
-      extract: php-src/ext/imap
     metadata:
       license-files: [LICENSE]
       license: PHP-3.01

@@ -4,7 +4,6 @@ ext-ssh2:
     source:
       type: ghtar
       repo: php/pecl-networking-ssh2
-      extract: php-src/ext/ssh2
     metadata:
       license-files: [LICENSE]
       license: PHP-3.01

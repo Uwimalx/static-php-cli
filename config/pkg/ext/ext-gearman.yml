@@ -4,7 +4,6 @@ ext-gearman:
     source:
       type: ghtar
       repo: php/pecl-networking-gearman
-      extract: php-src/ext/gearman
     metadata:
       license-files: [LICENSE]
       license: PHP-3.01

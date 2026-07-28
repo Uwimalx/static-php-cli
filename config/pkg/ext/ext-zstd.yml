@@ -4,7 +4,6 @@ ext-zstd:
     source:
       type: ghtar
       repo: kjdev/php-ext-zstd
-      extract: php-src/ext/zstd
     metadata:
       license-files: [LICENSE]
       license: MIT

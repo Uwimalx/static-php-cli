@@ -5,7 +5,6 @@ ext-igbinary:
       type: pie
       repo: igbinary/igbinary
       prefer-stable: false
-      extract: php-src/ext/igbinary
     metadata:
       license-files: [COPYING]
       license: BSD-3-Clause

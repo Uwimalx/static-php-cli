@@ -4,7 +4,7 @@ ext-opentelemetry:
     source:
       type: pie
       repo: open-telemetry/ext-opentelemetry
-      subdir: ext
+      source-root: ext
     metadata:
       license-files: [LICENSE]
       license: Apache-2.0

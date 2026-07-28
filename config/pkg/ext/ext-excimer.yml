@@ -4,7 +4,6 @@ ext-excimer:
     source:
       type: ghtagtar
       repo: wikimedia/mediawiki-php-excimer
-      extract: php-src/ext/excimer
     metadata:
       license-files: [LICENSE]
       license: PHP-3.01

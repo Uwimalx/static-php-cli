@@ -4,7 +4,6 @@ ext-yac:
     source:
       type: ghtagtar
       repo: laruence/yac
-      extract: php-src/ext/yac
     metadata:
       license-files: [LICENSE]
       license: PHP-3.01

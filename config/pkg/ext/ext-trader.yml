@@ -4,7 +4,6 @@ ext-trader:
     source:
       type: ghtagtar
       repo: php/pecl-math-trader
-      extract: php-src/ext/trader
     metadata:
       license-files: [LICENSE]
       license: BSD-2-Clause

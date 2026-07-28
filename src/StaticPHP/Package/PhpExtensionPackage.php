@@ -50,12 +50,15 @@ class PhpExtensionPackage extends Package
     public function getSourceDir(): string
     {
         $path = SOURCE_PATH . '/php-src/ext/' . $this->getExtensionName();
-        // Static in-tree builds prefer the extension source bundled with php-src when present
-        // (e.g. zip, or imap on PHP < 8.5). Shared (phpize) builds always use the artifact
-        // source. Bundled dirs are identified as real dirs without spc markers (.spc-ext-sync:
-        // our own copy; .spc-hash: stale in-tree extraction from an older spc layout).
-        if ($this->isBuildStatic() && is_dir($path) && !is_link($path)
-            && !file_exists("{$path}/.spc-ext-sync") && !file_exists("{$path}/.spc-hash")) {
+        // For in-tree builds (static, or shared with build-with-php), prefer the source
+        // present in php-src/ext: a dir bundled with php-src (e.g. zip, or imap on
+        // PHP < 8.5), or the link (Unix) / copy (Windows, .spc-ext-sync marker) placed
+        // by the php target's sync step. Build-stage patches must hit the tree actually
+        // being compiled, which differs from the artifact source for Windows copies.
+        // Dirs with a .spc-hash marker are stale in-tree extractions from an older spc
+        // layout and ignored. Shared (phpize) builds always use the artifact source.
+        if (($this->isBuildStatic() || $this->isBuildWithPhp()) && is_dir($path)
+            && (is_link($path) || !file_exists("{$path}/.spc-hash"))) {
             return $path;
         }
         if ($this->getArtifact() === null) {

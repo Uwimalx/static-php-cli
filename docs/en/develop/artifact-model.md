@@ -83,7 +83,7 @@ The basic format of a `source-object`:
   type: "url" # Download type
   # ...: Additional keys depend on the type; see below
   extract: "path/to/dir" # (optional) Override extract path; default: SOURCE_PATH/{artifact-name}
-  subdir: "src" # (optional) Subdirectory of the extracted source that contains the buildable source root
+  source-root: "src" # (optional) Subdirectory of the extracted source that contains the buildable source root
 ```
 
 ## Common Fields
@@ -95,17 +95,17 @@ Besides the type-specific keys, every source object accepts the following option
 - **Type**: `string` (optional)
 - **Description**: Overrides the extraction directory. Defaults to `SOURCE_PATH/{artifact-name}`.
 
-### subdir
+### source-root
 
 - **Type**: `string` (optional)
-- **Description**: When the buildable source root is located inside a subdirectory of the extracted archive, this field specifies that subdirectory path. The framework will use `source dir + subdir` as the working directory during the build instead of the top-level extraction directory. For example, a PIE package whose `config.m4` lives in an `ext/` subdirectory, or krb5 whose actual source root is in `src/` after extraction.
+- **Description**: When the buildable source root is located inside a subdirectory of the extracted archive, this field specifies that subdirectory path. The framework will use `source dir + source-root` as the working directory during the build instead of the top-level extraction directory. For example, a PIE package whose `config.m4` lives in an `ext/` subdirectory, or krb5 whose actual source root is in `src/` after extraction. For `php-extension` packages, sources are always extracted to the default source dir; before the in-tree PHP build runs `buildconf`, the php target links (Unix) or copies (Windows) each extension's source root into `php-src/ext/{name}` so the build can find `config.m4`/`config.w32` at the extension root.
 
 ```yaml
 # krb5's actual source root is in the src/ subdirectory after extraction
 source:
   type: url
   url: 'https://web.mit.edu/kerberos/dist/krb5/1.22/krb5-1.22.2.tar.gz'
-  subdir: src
+  source-root: src
 ```
 
 ## Metadata

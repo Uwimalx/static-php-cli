@@ -265,7 +265,7 @@ abstract class Package
 
     /**
      * Get the root directory of the buildable source tree.
-     * Equals the source dir unless source.subdir is declared in artifact config.
+     * Equals the source dir unless source.source-root is declared in artifact config.
      */
     public function getSourceRoot(): string
     {

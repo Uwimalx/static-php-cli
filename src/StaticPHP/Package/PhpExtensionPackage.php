@@ -61,8 +61,10 @@ class PhpExtensionPackage extends Package
 
     /**
      * Directory the extension is actually built in: cd'd into by phpize/configure/make.
-     * Equals getSourceDir() unless the artifact declares source.subdir (e.g. a PIE
-     * package whose config.m4 lives in an ext/ subdir).
+     * Equals getSourceDir() unless the artifact declares source.source-root (e.g. a
+     * PIE package whose config.m4 lives in an ext/ subdir). For in-tree PHP builds
+     * the php target links/copies the source root into php-src/ext/{name} before
+     * buildconf.
      */
     public function getSourceRoot(): string
     {

@@ -399,6 +399,44 @@ class php extends TargetPackage
         FileSystem::removeDir(BUILD_MODULES_PATH);
     }
 
+    /**
+     * Ensure every resolved extension with an artifact is present in php-src/ext.
+     * Extension sources are extracted to the default source dir (source/{name}); the
+     * in-tree PHP build requires each extension at php-src/ext/{name} with
+     * config.m4/config.w32 directly inside, so link (Unix) or copy (Windows) the
+     * extension source root into place before buildconf.
+     */
+    #[BeforeStage('php', 'build')]
+    public function syncExtensionSources(PackageInstaller $installer): void
+    {
+        foreach ($installer->getResolvedPackages(PhpExtensionPackage::class) as $ext) {
+            if ($ext->getArtifact() === null) {
+                continue;
+            }
+            $source_root = $ext->getSourceRoot();
+            if (!is_dir($source_root)) {
+                continue;
+            }
+            $ext_dir = FileSystem::convertPath(SOURCE_PATH . '/php-src/ext/' . $ext->getExtensionName());
+            // already in place: extracted directly in-tree, correct symlink, or bundled
+            if (realpath($ext_dir) === realpath($source_root)) {
+                continue;
+            }
+            if (is_link($ext_dir)) {
+                unlink($ext_dir);
+            } elseif (is_dir($ext_dir)) {
+                FileSystem::removeDir($ext_dir);
+            }
+            if (PHP_OS_FAMILY === 'Windows') {
+                logger()->debug("Copying extension [{$ext->getName()}] source root to {$ext_dir}...");
+                FileSystem::copyDir($source_root, $ext_dir);
+            } else {
+                logger()->debug("Linking extension [{$ext->getName()}] source root to {$ext_dir}...");
+                symlink($source_root, $ext_dir);
+            }
+        }
+    }
+
     #[Stage('postInstall')]
     public function postInstall(TargetPackage $package, PackageInstaller $installer): void
     {

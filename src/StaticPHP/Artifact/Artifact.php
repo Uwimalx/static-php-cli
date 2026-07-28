@@ -321,12 +321,12 @@ class Artifact
 
     /**
      * Get the root directory of the buildable source tree.
-     * Equals the source dir unless source.subdir is declared in artifact config.
+     * Equals the source dir unless source.source-root is declared in artifact config.
      */
     public function getSourceRoot(): string
     {
-        if (isset($this->config['source']['subdir'])) {
-            return FileSystem::convertPath($this->getSourceDir() . '/' . ltrim($this->config['source']['subdir'], '/'));
+        if (isset($this->config['source']['source-root'])) {
+            return FileSystem::convertPath($this->getSourceDir() . '/' . ltrim($this->config['source']['source-root'], '/'));
         }
         return $this->getSourceDir();
     }

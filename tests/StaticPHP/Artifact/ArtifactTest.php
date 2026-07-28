@@ -278,14 +278,14 @@ class ArtifactTest extends TestCase
         $this->assertSame($artifact->getSourceDir(), $artifact->getSourceRoot());
     }
 
-    public function testGetSourceRootUsesSourceSubdir(): void
+    public function testGetSourceRootUsesSourceRootField(): void
     {
         $cache = $this->makeStubbedArtifactCache([]);
         ApplicationContext::initialize();
         ApplicationContext::set(ArtifactCache::class, $cache);
 
         $artifact = new Artifact('my-pkg', [
-            'source' => ['type' => 'url', 'url' => 'https://example.com/file.tar.gz', 'subdir' => 'src'],
+            'source' => ['type' => 'url', 'url' => 'https://example.com/file.tar.gz', 'source-root' => 'src'],
         ]);
 
         $expected = $artifact->getSourceDir() . DIRECTORY_SEPARATOR . 'src';

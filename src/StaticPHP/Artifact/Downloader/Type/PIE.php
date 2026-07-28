@@ -22,7 +22,7 @@ class PIE implements DownloadTypeInterface, CheckUpdateInterface
         if (!$dist_url || !$dist_type) {
             throw new DownloaderException("failed to find {$name} dist info from packagist");
         }
-        $extract = $config['extract'] ?? ('php-src/ext/' . strtolower(preg_replace('/^ext-/i', '', $name)));
+        $extract = $config['extract'] ?? null;
         $name = str_replace('/', '_', $config['repo']);
         $version = $first['version'] ?? 'unknown';
         $filename = "{$name}-{$version}." . ($dist_type === 'zip' ? 'zip' : 'tar.gz');

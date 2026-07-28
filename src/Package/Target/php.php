@@ -405,6 +405,11 @@ class php extends TargetPackage
      * in-tree PHP build requires each extension at php-src/ext/{name} with
      * config.m4/config.w32 directly inside, so link (Unix) or copy (Windows) the
      * extension source root into place before buildconf.
+     *
+     * Existing dirs are classified by markers: a symlink or a .spc-ext-sync marker is
+     * our own link/copy (refreshed), a .spc-hash marker is a stale in-tree extraction
+     * from an older spc layout (replaced), anything else is bundled with php-src
+     * (e.g. zip, or imap on PHP < 8.5) and left untouched.
      */
     #[BeforeStage('php', 'build')]
     public function syncExtensionSources(PackageInstaller $installer): void
@@ -418,18 +423,25 @@ class php extends TargetPackage
                 continue;
             }
             $ext_dir = FileSystem::convertPath(SOURCE_PATH . '/php-src/ext/' . $ext->getExtensionName());
-            // already in place: extracted directly in-tree, correct symlink, or bundled
+            // already in place: bundled with php-src (getSourceDir prefers it for static
+            // builds), extracted directly in-tree, or a correct symlink
             if (realpath($ext_dir) === realpath($source_root)) {
                 continue;
             }
             if (is_link($ext_dir)) {
                 unlink($ext_dir);
             } elseif (is_dir($ext_dir)) {
+                if (!file_exists("{$ext_dir}/.spc-ext-sync") && !file_exists("{$ext_dir}/.spc-hash")) {
+                    // bundled with php-src, keep it (used when the extension is built shared only)
+                    logger()->debug("Extension [{$ext->getName()}] keeps bundled source at {$ext_dir}.");
+                    continue;
+                }
                 FileSystem::removeDir($ext_dir);
             }
             if (PHP_OS_FAMILY === 'Windows') {
                 logger()->debug("Copying extension [{$ext->getName()}] source root to {$ext_dir}...");
                 FileSystem::copyDir($source_root, $ext_dir);
+                FileSystem::writeFile("{$ext_dir}/.spc-ext-sync", $source_root);
             } else {
                 logger()->debug("Linking extension [{$ext->getName()}] source root to {$ext_dir}...");
                 symlink($source_root, $ext_dir);

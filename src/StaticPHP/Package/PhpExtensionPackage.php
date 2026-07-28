@@ -49,8 +49,16 @@ class PhpExtensionPackage extends Package
 
     public function getSourceDir(): string
     {
+        $path = SOURCE_PATH . '/php-src/ext/' . $this->getExtensionName();
+        // Static in-tree builds prefer the extension source bundled with php-src when present
+        // (e.g. zip, or imap on PHP < 8.5). Shared (phpize) builds always use the artifact
+        // source. Bundled dirs are identified as real dirs without spc markers (.spc-ext-sync:
+        // our own copy; .spc-hash: stale in-tree extraction from an older spc layout).
+        if ($this->isBuildStatic() && is_dir($path) && !is_link($path)
+            && !file_exists("{$path}/.spc-ext-sync") && !file_exists("{$path}/.spc-hash")) {
+            return $path;
+        }
         if ($this->getArtifact() === null) {
-            $path = SOURCE_PATH . '/php-src/ext/' . $this->getExtensionName();
             if (!is_dir($path)) {
                 throw new ValidationException("Extension source directory not found: {$path}", validation_module: "Extension {$this->getExtensionName()} source");
             }
@@ -337,7 +345,11 @@ class PhpExtensionPackage extends Package
             ->setEnv($env)
             ->exec('make clean')
             ->exec("make -j{$builder->concurrency}")
-            ->exec('make install');
+            ->exec('make install')
+            // distclean after install: phpize build residues (.lo/.libs/config.status) would
+            // poison a later static in-tree build sharing this source dir (php-src's make
+            // clean uses find, which does not follow the ext symlink)
+            ->exec('make distclean');
     }
 
     /**

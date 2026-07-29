@@ -158,6 +158,9 @@ class ArtifactExtractor
         $extract_config = $artifact->getDownloadConfig('source')['extract'] ?? null;
         if (is_array($extract_config)) {
             $this->doSelectiveExtract($name, $cache_info, $extract_config);
+            if (PHP_OS_FAMILY === 'Windows') {
+                FileSystem::sanitizeSymlinks($target_path);
+            }
             $artifact->emitAfterSourceExtract($target_path);
             logger()->debug("Emitted after-source-extract hooks for [{$name}]");
             return SPC_STATUS_EXTRACTED;
@@ -179,6 +182,12 @@ class ArtifactExtractor
 
         logger()->info("Extracting source [{$name}] to {$target_path}...");
         $this->doStandardExtract($name, $cache_info, $target_path);
+
+        if (PHP_OS_FAMILY === 'Windows') {
+            // symlinks in archives (e.g. LICENSE-zstd in php-ext-zstd) break
+            // tooling like xcopy, materialize them as regular files
+            FileSystem::sanitizeSymlinks($target_path);
+        }
 
         // Emit after hooks
         $artifact->emitAfterSourceExtract($target_path);

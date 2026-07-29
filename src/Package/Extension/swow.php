@@ -31,7 +31,7 @@ class swow extends PhpExtensionPackage
     public function patchBeforeBuildconf(): bool
     {
         // replace AC_DEFUN([SWOW_PKG_CHECK_MODULES] to AC_DEFUN([SWOW_PKG_CHECK_MODULES_STATIC]
-        FileSystem::replaceFileStr($this->getSourceRoot() . '/config.m4', 'AC_DEFUN([SWOW_PKG_CHECK_MODULES]', 'AC_DEFUN([SWOW_PKG_CHECK_MODULES_STATIC]');
+        FileSystem::replaceFileStr($this->getBuildDir() . '/config.m4', 'AC_DEFUN([SWOW_PKG_CHECK_MODULES]', 'AC_DEFUN([SWOW_PKG_CHECK_MODULES_STATIC]');
         return true;
     }
 }

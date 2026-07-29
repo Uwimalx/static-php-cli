@@ -403,13 +403,14 @@ class php extends TargetPackage
      * Ensure every resolved extension with an artifact is present in php-src/ext.
      * Extension sources are extracted to the default source dir (source/{name}); the
      * in-tree PHP build requires each extension at php-src/ext/{name} with
-     * config.m4/config.w32 directly inside, so link (Unix) or copy (Windows) the
-     * extension source root into place before buildconf.
+     * config.m4/config.w32 directly inside, so link the extension source root into
+     * place before buildconf: a symlink on Unix, an NTFS junction on Windows (with a
+     * plain copy as fallback), so patches always hit the tree actually compiled.
      *
-     * Existing dirs are classified by markers: a symlink or a .spc-ext-sync marker is
-     * our own link/copy (refreshed), a .spc-hash marker is a stale in-tree extraction
-     * from an older spc layout (replaced), anything else is bundled with php-src
-     * (e.g. zip, or imap on PHP < 8.5) and left untouched.
+     * Existing dirs are classified by markers: a link/junction is our own (refreshed
+     * when its target differs), a .spc-ext-sync marker is our Windows copy fallback
+     * (refreshed), anything else is bundled with php-src (e.g. zip, or imap on
+     * PHP < 8.5) and left untouched.
      */
     #[BeforeStage('php', 'build')]
     public function syncExtensionSources(PackageInstaller $installer): void
@@ -423,15 +424,15 @@ class php extends TargetPackage
                 continue;
             }
             $ext_dir = FileSystem::convertPath(SOURCE_PATH . '/php-src/ext/' . $ext->getExtensionName());
-            // already in place: bundled with php-src (getSourceDir prefers it for static
-            // builds), extracted directly in-tree, or a correct symlink
+            // already in place: bundled with php-src (getBuildDir prefers it for static
+            // builds), extracted directly in-tree, or a correct link/junction
             if (realpath($ext_dir) === realpath($source_root)) {
                 continue;
             }
-            if (is_link($ext_dir)) {
-                unlink($ext_dir);
+            if (FileSystem::isLink($ext_dir)) {
+                FileSystem::removeLink($ext_dir);
             } elseif (is_dir($ext_dir)) {
-                if (!file_exists("{$ext_dir}/.spc-ext-sync") && !file_exists("{$ext_dir}/.spc-hash")) {
+                if (!file_exists("{$ext_dir}/.spc-ext-sync")) {
                     // bundled with php-src, keep it (used when the extension is built shared only)
                     logger()->debug("Extension [{$ext->getName()}] keeps bundled source at {$ext_dir}.");
                     continue;
@@ -439,9 +440,12 @@ class php extends TargetPackage
                 FileSystem::removeDir($ext_dir);
             }
             if (PHP_OS_FAMILY === 'Windows') {
-                logger()->debug("Copying extension [{$ext->getName()}] source root to {$ext_dir}...");
-                FileSystem::copyDir($source_root, $ext_dir);
-                FileSystem::writeFile("{$ext_dir}/.spc-ext-sync", $source_root);
+                logger()->debug("Junctioning extension [{$ext->getName()}] source root to {$ext_dir}...");
+                if (!FileSystem::linkDir($source_root, $ext_dir)) {
+                    logger()->notice("Cannot junction extension [{$ext->getName()}] source root, falling back to copy.");
+                    FileSystem::copyDir($source_root, $ext_dir);
+                    FileSystem::writeFile("{$ext_dir}/.spc-ext-sync", $source_root);
+                }
             } else {
                 logger()->debug("Linking extension [{$ext->getName()}] source root to {$ext_dir}...");
                 symlink($source_root, $ext_dir);

@@ -18,7 +18,7 @@ class xhprof extends PhpExtensionPackage
     {
         // patch config.m4
         FileSystem::replaceFileStr(
-            "{$this->getSourceRoot()}/config.m4",
+            "{$this->getBuildDir()}/config.m4",
             'if test -f $phpincludedir/ext/pcre/php_pcre.h; then',
             'if test -f $abs_srcdir/ext/pcre/php_pcre.h; then'
         );

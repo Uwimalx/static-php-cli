@@ -49,19 +49,8 @@ class PhpExtensionPackage extends Package
 
     public function getSourceDir(): string
     {
-        $path = SOURCE_PATH . '/php-src/ext/' . $this->getExtensionName();
-        // For in-tree builds (static, or shared with build-with-php), prefer the source
-        // present in php-src/ext: a dir bundled with php-src (e.g. zip, or imap on
-        // PHP < 8.5), or the link (Unix) / copy (Windows, .spc-ext-sync marker) placed
-        // by the php target's sync step. Build-stage patches must hit the tree actually
-        // being compiled, which differs from the artifact source for Windows copies.
-        // Dirs with a .spc-hash marker are stale in-tree extractions from an older spc
-        // layout and ignored. Shared (phpize) builds always use the artifact source.
-        if (($this->isBuildStatic() || $this->isBuildWithPhp()) && is_dir($path)
-            && (is_link($path) || !file_exists("{$path}/.spc-hash"))) {
-            return $path;
-        }
         if ($this->getArtifact() === null) {
+            $path = SOURCE_PATH . '/php-src/ext/' . $this->getExtensionName();
             if (!is_dir($path)) {
                 throw new ValidationException("Extension source directory not found: {$path}", validation_module: "Extension {$this->getExtensionName()} source");
             }
@@ -71,11 +60,32 @@ class PhpExtensionPackage extends Package
     }
 
     /**
-     * Directory the extension is actually built in: cd'd into by phpize/configure/make.
-     * Equals getSourceDir() unless the artifact declares source.source-root (e.g. a
-     * PIE package whose config.m4 lives in an ext/ subdir). For in-tree PHP builds
-     * the php target links/copies the source root into php-src/ext/{name} before
-     * buildconf.
+     * Directory the extension is actually compiled in; build-stage patches and
+     * validations must target this path to hit the tree being compiled.
+     * For in-tree builds (static, or shared with build-with-php) this is the
+     * source present in php-src/ext: a dir bundled with php-src (e.g. zip, or
+     * imap on PHP < 8.5), or the link (Unix) / junction (Windows, copy as
+     * fallback) placed by the php target's sync step.
+     * For shared (phpize) builds this equals getSourceRoot().
+     */
+    public function getBuildDir(): string
+    {
+        $path = SOURCE_PATH . '/php-src/ext/' . $this->getExtensionName();
+        if (($this->isBuildStatic() || $this->isBuildWithPhp()) && is_dir($path)) {
+            return $path;
+        }
+        if ($this->getArtifact() === null) {
+            return $this->getSourceDir();
+        }
+        return $this->getSourceRoot();
+    }
+
+    /**
+     * Root of the buildable artifact source tree: equals getSourceDir() unless the
+     * artifact declares source.source-root (e.g. a PIE package whose config.m4
+     * lives in an ext/ subdir). This is what the php target links/junctions into
+     * php-src/ext/{name} before buildconf, and where shared (phpize) builds run;
+     * use getBuildDir() for the tree actually being compiled.
      */
     public function getSourceRoot(): string
     {

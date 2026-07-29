@@ -36,7 +36,7 @@ class clickhouse extends PhpExtensionPackage
         // configure conftest fail to link with "Undefined symbols: _get_module"
         if ($this->isBuildStatic()) {
             FileSystem::replaceFileStr(
-                $this->getSourceRoot() . '/config.m4',
+                $this->getBuildDir() . '/config.m4',
                 'LDFLAGS="$LDFLAGS -Wl,-exported_symbol,_get_module"',
                 ''
             );

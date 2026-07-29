@@ -45,7 +45,7 @@ class swoole extends PhpExtensionPackage
     #[PatchDescription('Fix maximum version check for Swoole 6.2')]
     public function patchBeforeMake(): void
     {
-        FileSystem::replaceFileStr($this->getSourceDir() . '/ext-src/php_swoole_private.h', 'PHP_VERSION_ID > 80500', 'PHP_VERSION_ID >= 80600');
+        FileSystem::replaceFileStr($this->getBuildDir() . '/ext-src/php_swoole_private.h', 'PHP_VERSION_ID > 80500', 'PHP_VERSION_ID >= 80600');
     }
 
     #[BeforeStage('php', [php::class, 'makeForUnix'], 'ext-swoole')]
@@ -56,7 +56,7 @@ class swoole extends PhpExtensionPackage
             // Fix swoole with event extension <util.h> conflict bug
             $util_path = shell()->execWithResult('xcrun --show-sdk-path', false)[1][0] . '/usr/include/util.h';
             FileSystem::replaceFileStr(
-                "{$this->getSourceDir()}/thirdparty/php/standard/proc_open.cc",
+                "{$this->getBuildDir()}/thirdparty/php/standard/proc_open.cc",
                 'include <util.h>',
                 "include \"{$util_path}\"",
             );

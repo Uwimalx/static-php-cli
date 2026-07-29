@@ -94,7 +94,7 @@ Artifact 包含 `source`、`binary` 和 `metadata` 三个部分。
 ### source-root
 
 - **类型**：`string`（选填）
-- **说明**：当可构建的源码根目录位于解压目录的子目录中时，使用该字段指定子目录路径。框架在构建时会以 `源码目录 + source-root` 作为工作目录，而非解压后的顶层目录。例如 `config.m4` 位于 `ext/` 子目录中的 PIE 扩展包，或解压后实际源码根在 `src/` 子目录下的 krb5。对于 `php-extension` 类型的包，源码始终解压到默认源码目录；在 PHP 内联构建执行 `buildconf` 之前，php target 会将每个扩展的源码根目录软链接（Unix）或复制（Windows）到 `php-src/ext/{name}`，以便构建系统能在扩展根目录找到 `config.m4`/`config.w32`。
+- **说明**：当可构建的源码根目录位于解压目录的子目录中时，使用该字段指定子目录路径。框架在构建时会以 `源码目录 + source-root` 作为工作目录，而非解压后的顶层目录。例如 `config.m4` 位于 `ext/` 子目录中的 PIE 扩展包，或解压后实际源码根在 `src/` 子目录下的 krb5。对于 `php-extension` 类型的包，源码始终解压到默认源码目录；在 PHP 内联构建执行 `buildconf` 之前，php target 会将每个扩展的源码根目录链接到 `php-src/ext/{name}`——Unix 上使用符号链接，Windows 上使用 NTFS junction（失败时回退为普通复制）——以便构建系统能在扩展根目录找到 `config.m4`/`config.w32`，且构建阶段的补丁始终作用于实际被编译的源码树。扩展包类可以使用 `getBuildDir()` 定位该树（shared phpize 构建时等同于 `getSourceRoot()`），而 `getSourceDir()`/`getSourceRoot()` 始终指向 artifact 源码侧。
 
 ```yaml
 # krb5 的源码解压后实际根目录在 src/ 子目录下

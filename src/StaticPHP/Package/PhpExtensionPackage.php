@@ -59,6 +59,42 @@ class PhpExtensionPackage extends Package
         return parent::getSourceDir();
     }
 
+    /**
+     * Directory the extension is actually compiled in; build-stage patches and
+     * validations must target this path to hit the tree being compiled.
+     * For in-tree builds (static, or shared with build-with-php) this is the
+     * source present in php-src/ext: a dir bundled with php-src (e.g. zip, or
+     * imap on PHP < 8.5), or the link (Unix) / junction (Windows, copy as
+     * fallback) placed by the php target's sync step.
+     * For shared (phpize) builds this equals getSourceRoot().
+     */
+    public function getBuildDir(): string
+    {
+        $path = SOURCE_PATH . '/php-src/ext/' . $this->getExtensionName();
+        if (($this->isBuildStatic() || $this->isBuildWithPhp()) && is_dir($path)) {
+            return $path;
+        }
+        if ($this->getArtifact() === null) {
+            return $this->getSourceDir();
+        }
+        return $this->getSourceRoot();
+    }
+
+    /**
+     * Root of the buildable artifact source tree: equals getSourceDir() unless the
+     * artifact declares source.source-root (e.g. a PIE package whose config.m4
+     * lives in an ext/ subdir). This is what the php target links/junctions into
+     * php-src/ext/{name} before buildconf, and where shared (phpize) builds run;
+     * use getBuildDir() for the tree actually being compiled.
+     */
+    public function getSourceRoot(): string
+    {
+        if ($this->getArtifact() === null) {
+            return $this->getSourceDir();
+        }
+        return parent::getSourceRoot();
+    }
+
     public function getExtensionName(): string
     {
         return str_replace('ext-', '', $this->getName());
@@ -293,7 +329,7 @@ class PhpExtensionPackage extends Package
     #[Stage]
     public function phpizeForUnix(array $env, PhpExtensionPackage $package): void
     {
-        shell()->cd($package->getSourceDir())->setEnv($env)->exec(BUILD_BIN_PATH . '/phpize');
+        shell()->cd($package->getSourceRoot())->setEnv($env)->exec(BUILD_BIN_PATH . '/phpize');
     }
 
     /**
@@ -303,7 +339,7 @@ class PhpExtensionPackage extends Package
     public function configureForUnix(array $env, PhpExtensionPackage $package): void
     {
         $phpvars = getenv('SPC_EXTRA_PHP_VARS') ?: '';
-        shell()->cd($package->getSourceDir())
+        shell()->cd($package->getSourceRoot())
             ->setEnv($env)
             ->exec(
                 './configure ' . $this->getPhpConfigureArg(SystemTarget::getTargetOS(), true) .
@@ -318,11 +354,15 @@ class PhpExtensionPackage extends Package
     #[Stage]
     public function makeForUnix(array $env, PhpExtensionPackage $package, PackageBuilder $builder): void
     {
-        shell()->cd($package->getSourceDir())
+        shell()->cd($package->getSourceRoot())
             ->setEnv($env)
             ->exec('make clean')
             ->exec("make -j{$builder->concurrency}")
-            ->exec('make install');
+            ->exec('make install')
+            // distclean after install: phpize build residues (.lo/.libs/config.status) would
+            // poison a later static in-tree build sharing this source dir (php-src's make
+            // clean uses find, which does not follow the ext symlink)
+            ->exec('make distclean');
     }
 
     /**

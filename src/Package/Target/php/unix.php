@@ -41,14 +41,16 @@ trait unix
         // php-src patches from micro (reads SPC_MICRO_PATCHES env var)
         SourcePatcher::patchPhpSrc();
 
-        // patch configure.ac for musl and musl-toolchain
+        // patch libc detection for musl and musl-toolchain
         $musl = SystemTarget::getTargetOS() === 'Linux' && SystemTarget::getLibc() === 'musl';
         FileSystem::backupFile(SOURCE_PATH . '/php-src/configure.ac');
-        FileSystem::replaceFileStr(
-            SOURCE_PATH . '/php-src/configure.ac',
-            'if command -v ldd >/dev/null && ldd --version 2>&1 | grep ^musl >/dev/null 2>&1',
-            'if ' . ($musl ? 'true' : 'false')
-        );
+        foreach (['configure.ac', 'build/php.m4'] as $libc_probe_file) {
+            FileSystem::replaceFileStr(
+                SOURCE_PATH . "/php-src/{$libc_probe_file}",
+                'command -v ldd >/dev/null && ldd --version 2>&1 | grep ^musl >/dev/null 2>&1',
+                $musl ? 'true' : 'false'
+            );
+        }
 
         // let php m4 tools use static pkg-config
         FileSystem::replaceFileStr("{$package->getSourceDir()}/build/php.m4", 'PKG_CHECK_MODULES(', 'PKG_CHECK_MODULES_STATIC(');
@@ -134,6 +136,11 @@ trait unix
 
         $static_extension_str = $this->makeStaticExtensionString($installer);
 
+        $configure_str = "{$cmd} {$args} {$static_extension_str}";
+        if ($version_id >= 80600) {
+            $configure_str = str_replace('--with-pic', '--enable-pic', $configure_str);
+        }
+
         // reuse the same make vars so configure conftest links use the same LIBS (incl. -framework flags)
         $vars = $this->makeVars($installer);
 
@@ -143,7 +150,7 @@ trait unix
             'CPPFLAGS' => "-I{$package->getIncludeDir()}",
             'LDFLAGS' => "-L{$package->getLibDir()} " . getenv('SPC_CMD_VAR_PHP_MAKE_EXTRA_LDFLAGS'),
             'LIBS' => $vars['EXTRA_LIBS'] ?? '',
-        ])->exec("{$cmd} {$args} {$static_extension_str}"), $package->getSourceDir());
+        ])->exec($configure_str), $package->getSourceDir());
     }
 
     #[BeforeStage('php', [self::class, 'makeForUnix'], 'php')]

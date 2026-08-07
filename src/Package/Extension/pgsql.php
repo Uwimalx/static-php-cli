@@ -13,6 +13,7 @@ use StaticPHP\Package\PackageBuilder;
 use StaticPHP\Package\PackageInstaller;
 use StaticPHP\Package\PhpExtensionPackage;
 use StaticPHP\Package\TargetPackage;
+use StaticPHP\Util\DependencyResolver;
 use StaticPHP\Util\FileSystem;
 use StaticPHP\Util\SPCConfigUtil;
 
@@ -24,14 +25,18 @@ class pgsql extends PhpExtensionPackage
     public function getUnixConfigureArg(bool $shared, PackageBuilder $builder, PackageInstaller $installer): string
     {
         if (php::getPHPVersionID() >= 80400) {
-            $libfiles = new SPCConfigUtil(['libs_only_deps' => true, 'absolute_libs' => true])->getPackageDepsConfig('postgresql', array_keys($installer->getResolvedPackages()))['libs'];
-            $libfiles = str_replace("{$builder->getLibDir()}/lib", '-l', $libfiles);
-            $libfiles = str_replace('.a', '', $libfiles);
-            return '--with-pgsql' . ($shared ? '=shared' : '') .
-                ' PGSQL_CFLAGS=-I' . $builder->getIncludeDir() .
-                ' PGSQL_LIBS="-L' . $builder->getLibDir() . ' ' . $libfiles . '"';
+            return '--with-pgsql' . ($shared ? '=shared' : '') . self::libpqConfigureVars($builder, $installer);
         }
         return '--with-pgsql=' . ($shared ? 'shared,' : '') . $builder->getBuildRootPath();
+    }
+
+    /** These override pkg-config, so they must carry libpq itself too */
+    public static function libpqConfigureVars(PackageBuilder $builder, PackageInstaller $installer): string
+    {
+        $closure = DependencyResolver::getResolvedPackageClosure(['postgresql'], array_keys($installer->getResolvedPackages()));
+        $libfiles = new SPCConfigUtil(['no_php' => true, 'libs_only_deps' => true])->configWithResolvedPackages($closure)['libs'];
+        return ' PGSQL_CFLAGS=-I' . $builder->getIncludeDir() .
+            ' PGSQL_LIBS="-L' . $builder->getLibDir() . ' ' . $libfiles . '"';
     }
 
     #[CustomPhpConfigureArg('Windows')]
@@ -67,7 +72,8 @@ class pgsql extends PhpExtensionPackage
     public function getSharedExtensionEnv(): array
     {
         $parent = parent::getSharedExtensionEnv();
-        $parent['CFLAGS'] .= ' -std=c17 -Wno-int-conversion';
+        // gnu17, not c17: PHP 8.6 headers use typeof
+        $parent['CFLAGS'] .= ' -std=gnu17 -Wno-int-conversion';
         return $parent;
     }
 }

@@ -553,7 +553,8 @@ HEADER;
             $vc_matches = ['unknown', 'unknown'];
         } else {
             $vc_matches = match ($vc['major_version']) {
-                '18', // VS 2026 shares the VS2022 (v143) runtime conventions, so it reports as VS17.
+                // PHP >= 8.6 knows about VS 2026 (v144), so report it as VS18.
+                '18' => $this->getPHPVersionID() >= 80600 ? ['VS18', 'Visual C++ 2026'] : ['VS17', 'Visual C++ 2022'],
                 '17' => ['VS17', 'Visual C++ 2022'],
                 '16' => ['VS16', 'Visual C++ 2019'],
                 default => ['unknown', 'unknown'],

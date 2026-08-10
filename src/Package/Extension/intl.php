@@ -31,10 +31,13 @@ class intl extends PhpExtensionPackage
     public function patchBeforeBuildconfForWindows(PackageInstaller $installer): void
     {
         $php_src = $installer->getTargetPackage('php')->getSourceDir();
+        // Match only the tail of the EXTENSION() call: the source list changes between PHP
+        // versions (8.6 added intl_icu_compat.c) and a missed replacement silently leaves the
+        // hardcoded true, which builds intl shared and drops it from the static binary.
         FileSystem::replaceFileStr(
             "{$php_src}/ext/intl/config.w32",
-            'EXTENSION("intl", "php_intl.c intl_convert.c intl_convertcpp.cpp intl_error.c ", true,',
-            'EXTENSION("intl", "php_intl.c intl_convert.c intl_convertcpp.cpp intl_error.c ", PHP_INTL_SHARED,'
+            'intl_error.c ", true,',
+            'intl_error.c ", PHP_INTL_SHARED,'
         );
         // ICU 73+ headers (char16ptr.h etc.) unconditionally include <string_view> which requires C++17.
         FileSystem::replaceFileStr(

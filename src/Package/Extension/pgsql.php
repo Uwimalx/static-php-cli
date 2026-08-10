@@ -13,7 +13,6 @@ use StaticPHP\Package\PackageBuilder;
 use StaticPHP\Package\PackageInstaller;
 use StaticPHP\Package\PhpExtensionPackage;
 use StaticPHP\Package\TargetPackage;
-use StaticPHP\Util\DependencyResolver;
 use StaticPHP\Util\FileSystem;
 use StaticPHP\Util\SPCConfigUtil;
 
@@ -25,18 +24,13 @@ class pgsql extends PhpExtensionPackage
     public function getUnixConfigureArg(bool $shared, PackageBuilder $builder, PackageInstaller $installer): string
     {
         if (php::getPHPVersionID() >= 80400) {
-            return '--with-pgsql' . ($shared ? '=shared' : '') . self::libpqConfigureVars($builder, $installer);
+            // These override pkg-config, so they must carry libpq itself too
+            $libs = new SPCConfigUtil(['no_php' => true, 'libs_only_deps' => true])->configForResolvedBuild(['postgresql'], $installer)['libs'];
+            return '--with-pgsql' . ($shared ? '=shared' : '') .
+                ' PGSQL_CFLAGS=-I' . $builder->getIncludeDir() .
+                ' PGSQL_LIBS="-L' . $builder->getLibDir() . ' ' . $libs . '"';
         }
         return '--with-pgsql=' . ($shared ? 'shared,' : '') . $builder->getBuildRootPath();
-    }
-
-    /** These override pkg-config, so they must carry libpq itself too */
-    public static function libpqConfigureVars(PackageBuilder $builder, PackageInstaller $installer): string
-    {
-        $closure = DependencyResolver::getResolvedPackageClosure(['postgresql'], array_keys($installer->getResolvedPackages()));
-        $libfiles = new SPCConfigUtil(['no_php' => true, 'libs_only_deps' => true])->configWithResolvedPackages($closure)['libs'];
-        return ' PGSQL_CFLAGS=-I' . $builder->getIncludeDir() .
-            ' PGSQL_LIBS="-L' . $builder->getLibDir() . ' ' . $libfiles . '"';
     }
 
     #[CustomPhpConfigureArg('Windows')]

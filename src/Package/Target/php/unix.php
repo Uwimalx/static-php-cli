@@ -366,7 +366,7 @@ trait unix
     }
 
     #[Stage]
-    public function unixBuildSharedExt(PackageInstaller $installer, ToolchainInterface $toolchain, PackageBuilder $builder): void
+    public function unixBuildSharedExt(PackageInstaller $installer, ToolchainInterface $toolchain): void
     {
         // collect shared extensions
         /** @var PhpExtensionPackage[] $shared_extensions */
@@ -393,27 +393,11 @@ trait unix
             $this->installRemovedMacroCompatHeader();
         }
 
-        $allow_failure = (bool) $builder->getOption('allow-shared-ext-failure', false);
-        if ($allow_failure) {
-            logger()->warning('allow-shared-ext-failure is ON: shared extension build/load failures will be skipped, not fatal.');
-        }
-
         try {
             logger()->debug('Building shared extensions...');
             foreach ($shared_extensions as $extension) {
-                InteractiveTerm::setMessage('Building shared extension: ' . ConsoleColor::yellow($extension->getName()));
-                try {
-                    $extension->buildShared();
-                } catch (\Throwable $e) {
-                    InteractiveTerm::error('Building shared extension failed: ' . ConsoleColor::red($extension->getName()));
-                    if (!$allow_failure) {
-                        throw $e;
-                    }
-                    $extension->markSharedSkipped('build', $e);
-                    InteractiveTerm::error('SKIPPING shared extension ' . ConsoleColor::red($extension->getName()) . ' (allow-shared-ext-failure): ' . $e->getMessage());
-                    continue;
-                }
-                InteractiveTerm::success('Built shared extension: ' . ConsoleColor::green($extension->getName()), true);
+                InteractiveTerm::setMessage('Building shared PHP extension: ' . ConsoleColor::yellow($extension->getName()));
+                $extension->buildShared();
             }
         } finally {
             // restore php-config
@@ -537,7 +521,7 @@ trait unix
     }
 
     #[Stage]
-    public function smokeTestCliForUnix(PackageInstaller $installer, PackageBuilder $builder): void
+    public function smokeTestCliForUnix(PackageInstaller $installer): void
     {
         InteractiveTerm::setMessage('Running basic php-cli smoke test');
         [$ret, $output] = shell()->execWithResult(BUILD_BIN_PATH . '/php -n -r "echo \"hello\";"');
@@ -546,23 +530,10 @@ trait unix
             throw new ValidationException("cli failed smoke test. code: {$ret}, output: {$raw_output}", validation_module: 'php-cli smoke test');
         }
 
-        $allow_failure = (bool) $builder->getOption('allow-shared-ext-failure', false);
         $exts = $installer->getResolvedPackages(PhpExtensionPackage::class);
         foreach ($exts as $ext) {
-            if ($ext->isSharedSkipped()) {
-                continue;
-            }
             InteractiveTerm::setMessage('Running php-cli smoke test for ' . ConsoleColor::yellow($ext->getExtensionName()) . ' extension');
-            try {
-                $ext->runSmokeTestCliUnix();
-            } catch (\Throwable $e) {
-                // only shared, separately-built extensions are skippable; static and build-with-php ones stay fatal
-                if (!$allow_failure || !$ext->isBuildShared() || $ext->isBuildWithPhp()) {
-                    throw $e;
-                }
-                $ext->markSharedSkipped('load', $e);
-                InteractiveTerm::error('SKIPPING shared extension ' . ConsoleColor::red($ext->getExtensionName()) . ' — failed to load (allow-shared-ext-failure): ' . $e->getMessage());
-            }
+            $ext->runSmokeTestCliUnix();
         }
     }
 

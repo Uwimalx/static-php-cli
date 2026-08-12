@@ -31,9 +31,6 @@ class PhpExtensionPackage extends Package
 
     protected bool $build_with_php = false;
 
-    /** @var null|array{phase: string, exception: string, message: string} Set when --allow-shared-ext-failure quarantines this extension */
-    protected ?array $skip_record = null;
-
     /**
      * @param string $name Name of the php extension
      * @param string $type Type of the package, defaults to 'php-extension'
@@ -199,53 +196,6 @@ class PhpExtensionPackage extends Package
     public function isBuildWithPhp(): bool
     {
         return $this->build_with_php;
-    }
-
-    /**
-     * Quarantine this shared extension: drop it from every shared filter, delete the artefacts it
-     * may have left behind, and remember why so php::postInstall() can write it to the manifest.
-     *
-     * @param string $phase 'build' or 'load'
-     */
-    public function markSharedSkipped(string $phase, \Throwable $e): void
-    {
-        $this->skip_record = ['phase' => $phase, 'exception' => $e::class, 'message' => $e->getMessage()];
-        $this->setBuildShared(false);
-        $this->removeBuiltSharedObject();
-        $this->setOutput('Shared extension SKIPPED', "{$phase} failure: {$e->getMessage()}");
-    }
-
-    /**
-     * @return null|array{phase: string, exception: string, message: string}
-     */
-    public function getSharedSkipRecord(): ?array
-    {
-        return $this->skip_record;
-    }
-
-    public function isSharedSkipped(): bool
-    {
-        return $this->skip_record !== null;
-    }
-
-    /**
-     * Delete the .so (and its debug info) of a skipped shared extension so it can never be packaged.
-     */
-    public function removeBuiltSharedObject(): void
-    {
-        // libtool's -release X gives $name-X.so as the real file, $name.so as a symlink to it
-        $release = preg_match('/-release\s+(\S+)/', (string) getenv('SPC_CMD_VAR_PHP_MAKE_EXTRA_LDFLAGS'), $m) ? "-{$m[1]}" : '';
-        $name = $this->getExtensionName();
-        foreach ([
-            BUILD_MODULES_PATH . "/{$name}{$release}.so",
-            BUILD_MODULES_PATH . "/{$name}.so",
-            BUILD_ROOT_PATH . "/debug/{$name}{$release}.so.debug",
-        ] as $file) {
-            if (file_exists($file) || is_link($file)) {
-                @unlink($file);
-                logger()->warning("Removed artefact of skipped extension: {$file}");
-            }
-        }
     }
 
     public function buildShared(): void
@@ -518,7 +468,7 @@ class PhpExtensionPackage extends Package
     {
         $sharedExts = array_filter(
             $this->getInstaller()->getResolvedPackages(PhpExtensionPackage::class),
-            fn (PhpExtensionPackage $ext) => $ext->isBuildShared() && !$ext->isBuildWithPhp() && !$ext->isSharedSkipped()
+            fn (PhpExtensionPackage $ext) => $ext->isBuildShared() && !$ext->isBuildWithPhp()
         );
 
         if (empty($sharedExts)) {

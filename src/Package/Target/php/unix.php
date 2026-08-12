@@ -43,7 +43,6 @@ trait unix
 
         // patch libc detection for musl and musl-toolchain
         $musl = SystemTarget::getTargetOS() === 'Linux' && SystemTarget::getLibc() === 'musl';
-        FileSystem::backupFile(SOURCE_PATH . '/php-src/configure.ac');
         foreach (['configure.ac', 'build/php.m4'] as $libc_probe_file) {
             FileSystem::replaceFileStr(
                 SOURCE_PATH . "/php-src/{$libc_probe_file}",

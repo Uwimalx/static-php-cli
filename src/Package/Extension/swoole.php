@@ -71,7 +71,7 @@ class swoole extends PhpExtensionPackage
         $arg = '--enable-swoole' . ($shared ? '=shared' : '');
 
         // commonly used feature: coroutine-time
-        $arg .= ' --enable-swoole-coro-time --with-pic';
+        $arg .= ' --enable-swoole-coro-time';
 
         $arg .= $builder->getOption('enable-zts') ? ' --enable-swoole-thread --disable-thread-context' : ' --disable-swoole-thread --enable-thread-context';
 

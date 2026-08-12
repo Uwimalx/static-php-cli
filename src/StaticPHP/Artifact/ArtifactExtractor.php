@@ -175,7 +175,10 @@ class ArtifactExtractor
         }
 
         // Remove old directory if hash mismatch
-        if (is_dir($target_path)) {
+        if (FileSystem::isLink($target_path)) {
+            logger()->debug("Source [{$name}] is linked to a local directory, relinking...");
+            FileSystem::removeLink($target_path);
+        } elseif (is_dir($target_path)) {
             logger()->notice("Source [{$name}] hash mismatch, re-extracting...");
             FileSystem::removeDir($target_path);
         }

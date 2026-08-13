@@ -73,7 +73,7 @@ class swoole extends PhpExtensionPackage
         // commonly used feature: coroutine-time
         $arg .= ' --enable-swoole-coro-time';
 
-        $arg .= $builder->getOption('enable-zts') ? ' --enable-swoole-thread --disable-thread-context' : ' --disable-swoole-thread --enable-thread-context';
+        $arg .= $builder->getOption('enable-zts') ? ' --enable-swoole-thread --disable-thread-context' : ' --disable-swoole-thread --disable-thread-context';
 
         // required features: curl, openssl (but curl hook is buggy for php 8.0)
         $arg .= php::getPHPVersionID() >= 80100 ? ' --enable-swoole-curl' : ' --disable-swoole-curl';

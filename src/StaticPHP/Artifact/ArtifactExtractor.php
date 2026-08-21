@@ -136,6 +136,11 @@ class ArtifactExtractor
             throw new WrongUsageException("Artifact source [{$name}] not downloaded, please download it first!");
         }
 
+        if (($cache_info['cache_type'] ?? null) === 'local') {
+            $artifact->emitAfterSourceExtract($artifact->getSourceDir());
+            return SPC_STATUS_ALREADY_EXTRACTED;
+        }
+
         $source_file = $this->cache->getCacheFullPath($cache_info);
         $target_path = $artifact->getSourceDir();
 

@@ -10,14 +10,14 @@ on:
       php_version:
         description: 'PHP 版本 (例如 8.2)'
         required: true
-        default: '8.5'
+        default: '8.5'  # 这里可以填 8.5
 
 jobs:
   build:
-    runs-on: ubuntu-latest  # runner 环境无需关心 glibc，因为我们用容器编译
+    runs-on: ubuntu-latest
     strategy:
       matrix:
-        php-version: ['8.5']
+        php-version: ['8.5']  # 可以根据需要添加
 
     steps:
       - name: Checkout code
@@ -25,19 +25,16 @@ jobs:
 
       - name: Build swoole.so inside Docker
         run: |
-          # 设置版本变量
           PHP_VERSION="${{ matrix.php-version }}"
           SWOOLE_VERSION="${{ github.event.inputs.swoole_version }}"
           
-          # 选择基础镜像（Debian 10 buster，glibc 2.28）
-          IMAGE="php:${PHP_VERSION}-cli-buster"
+          # 关键修改：不再指定发行版后缀，使用默认镜像（基于 Debian 12, glibc 2.36）
+          IMAGE="php:${PHP_VERSION}-cli"
           
-          # 创建临时构建脚本
           cat > build-swoole.sh << 'EOF'
           #!/bin/bash
           set -e
           
-          # 更新源并安装编译工具和依赖
           apt-get update
           apt-get install -y --no-install-recommends \
               build-essential \
@@ -47,7 +44,6 @@ jobs:
               unzip \
               pkg-config
           
-          # 如果指定了 Swoole 版本，则从 GitHub 下载源码编译，否则用 pecl 安装最新版
           if [ -n "$SWOOLE_VERSION" ]; then
               echo "Installing Swoole $SWOOLE_VERSION from source..."
               git clone --branch v$SWOOLE_VERSION --single-branch https://github.com/swoole/swoole-src.git /tmp/swoole
@@ -61,17 +57,14 @@ jobs:
               pecl install swoole
           fi
           
-          # 获取扩展目录并复制 so 文件到 /output 目录（挂载卷）
           EXT_DIR=$(php -r "echo ini_get('extension_dir');")
           mkdir -p /output
           cp "$EXT_DIR/swoole.so" /output/
           echo "swoole.so copied to /output/"
           EOF
           
-          # 赋予执行权限
           chmod +x build-swoole.sh
           
-          # 在容器中运行构建脚本，并将当前目录挂载到容器内用于输出
           docker run --rm \
               -v $(pwd):/workspace \
               -w /workspace \
@@ -79,16 +72,20 @@ jobs:
               "$IMAGE" \
               bash -c "bash build-swoole.sh && cp /output/swoole.so /workspace/"
           
-          # 验证生成的 swoole.so 是否存在
           if [ ! -f "swoole.so" ]; then
               echo "❌ Failed to generate swoole.so"
               exit 1
           fi
           echo "✅ swoole.so generated successfully"
 
+      - name: (可选) 检查生成的 so 依赖的 glibc 版本
+        run: |
+          echo "Highest GLIBC version required:"
+          objdump -T swoole.so | grep GLIBC_ | sed 's/.*GLIBC_\([0-9.]*\).*/\1/g' | sort -uV | tail -1
+
       - name: Upload swoole.so
         uses: actions/upload-artifact@v4
         with:
-          name: swoole-so-php-${{ matrix.php-version }}-debian10-glibc2.28
+          name: swoole-so-php-${{ matrix.php-version }}-default
           path: swoole.so
           retention-days: 30

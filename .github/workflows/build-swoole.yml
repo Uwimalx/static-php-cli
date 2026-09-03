@@ -1,34 +1,37 @@
-name: Build Swoole Extension (Docker, fixed)
+name: Build Swoole for PHP 8.4 (Debian 11, glibc 2.31)
 
 on:
   workflow_dispatch:
     inputs:
       swoole_version:
-        description: 'Swoole 版本 (留空则使用最新稳定版)'
+        description: 'Swoole 版本号 (留空则自动使用最新稳定版)'
         required: false
         default: ''
       php_version:
-        description: 'PHP 版本 (例如 8.2 或 8.5)'
+        description: 'PHP 版本'
         required: true
-        default: '8.5'
+        default: '8.4'
 
 jobs:
   build:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        php-version: ['8.1', '8.2', '8.3', '8.5']
+        # 这里只构建 PHP 8.4，如果你需要其他版本可自行添加，但建议保持 bullseye 基础镜像
+        php-version: ['8.4']
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Build swoole.so inside Docker
+      - name: Build swoole.so inside Docker (bullseye)
         run: |
           PHP_VERSION="${{ matrix.php-version }}"
           SWOOLE_VERSION="${{ github.event.inputs.swoole_version }}"
-          IMAGE="php:${PHP_VERSION}-cli"
-
+          
+          # 使用 Debian 11 (bullseye) 基础镜像，glibc 2.31
+          IMAGE="php:${PHP_VERSION}-cli-bullseye"
+          
           cat > build-swoole.sh << 'EOF'
           #!/bin/bash
           set -e
@@ -42,10 +45,10 @@ jobs:
               unzip \
               pkg-config
 
-          # 关键：安装 PHP 的 sockets 扩展，提供头文件
+          # 安装 PHP 的 sockets 扩展（提供头文件）
           docker-php-ext-install sockets
 
-          # 获取 Swoole 版本
+          # 确定 Swoole 版本（若未指定则获取最新稳定版）
           if [ -n "$SWOOLE_VERSION" ]; then
               SWOOLE_TAG="v${SWOOLE_VERSION}"
           else
@@ -96,6 +99,6 @@ jobs:
       - name: Upload swoole.so
         uses: actions/upload-artifact@v4
         with:
-          name: swoole-so-php-${{ matrix.php-version }}
+          name: swoole-so-php-${{ matrix.php-version }}-bullseye-glibc2.31
           path: swoole.so
           retention-days: 30

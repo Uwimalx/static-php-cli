@@ -1,20 +1,20 @@
-name: Build Swoole Extension
+name: Build Swoole Extension (Docker)
 
 on:
   workflow_dispatch:
     inputs:
       swoole_version:
-        description: 'Swoole 版本 (留空则安装最新版)'
+        description: 'Swoole 版本 (留空则安装最新稳定版)'
         required: false
         default: ''
       php_version:
-        description: 'PHP 版本'
+        description: 'PHP 版本 (例如 8.2)'
         required: true
         default: '8.5'
 
 jobs:
   build:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-latest  # runner 环境无需关心 glibc，因为我们用容器编译
     strategy:
       matrix:
         php-version: ['8.5']
@@ -23,42 +23,72 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Setup PHP
-        uses: shivammathur/setup-php@v2
-        with:
-          php-version: ${{ matrix.php-version }}
-          extensions: swoole
-          tools: phpize
-        env:
-          SWOOLE_CONFIGURE_OPTS: --enable-openssl --enable-http2
-
-      - name: Install specific Swoole version (if requested)
-        if: github.event.inputs.swoole_version != ''
+      - name: Build swoole.so inside Docker
         run: |
-          pecl uninstall -r swoole
-          pecl install swoole-${{ github.event.inputs.swoole_version }}
-
-      # 使用 PHP 内置函数获取扩展目录（更稳定）
-      - name: Get extension directory
-        id: get-ext-dir
-        run: |
-          EXT_DIR=$(php -r "echo ini_get('extension_dir');")
-          echo "EXT_DIR=$EXT_DIR" >> $GITHUB_OUTPUT
-          echo "Swoole extension installed at: $EXT_DIR/swoole.so"
-
-      # 验证文件是否存在
-      - name: Verify swoole.so
-        run: |
-          EXT_DIR=$(php -r "echo ini_get('extension_dir');")
-          if [ ! -f "$EXT_DIR/swoole.so" ]; then
-            echo "Error: swoole.so not found in $EXT_DIR"
-            exit 1
+          # 设置版本变量
+          PHP_VERSION="${{ matrix.php-version }}"
+          SWOOLE_VERSION="${{ github.event.inputs.swoole_version }}"
+          
+          # 选择基础镜像（Debian 10 buster，glibc 2.28）
+          IMAGE="php:${PHP_VERSION}-cli-buster"
+          
+          # 创建临时构建脚本
+          cat > build-swoole.sh << 'EOF'
+          #!/bin/bash
+          set -e
+          
+          # 更新源并安装编译工具和依赖
+          apt-get update
+          apt-get install -y --no-install-recommends \
+              build-essential \
+              autoconf \
+              libssl-dev \
+              git \
+              unzip \
+              pkg-config
+          
+          # 如果指定了 Swoole 版本，则从 GitHub 下载源码编译，否则用 pecl 安装最新版
+          if [ -n "$SWOOLE_VERSION" ]; then
+              echo "Installing Swoole $SWOOLE_VERSION from source..."
+              git clone --branch v$SWOOLE_VERSION --single-branch https://github.com/swoole/swoole-src.git /tmp/swoole
+              cd /tmp/swoole
+              phpize
+              ./configure --enable-openssl --enable-http2
+              make -j$(nproc)
+              make install
+          else
+              echo "Installing latest Swoole via pecl..."
+              pecl install swoole
           fi
-          echo "✅ swoole.so is ready at $EXT_DIR/swoole.so"
+          
+          # 获取扩展目录并复制 so 文件到 /output 目录（挂载卷）
+          EXT_DIR=$(php -r "echo ini_get('extension_dir');")
+          mkdir -p /output
+          cp "$EXT_DIR/swoole.so" /output/
+          echo "swoole.so copied to /output/"
+          EOF
+          
+          # 赋予执行权限
+          chmod +x build-swoole.sh
+          
+          # 在容器中运行构建脚本，并将当前目录挂载到容器内用于输出
+          docker run --rm \
+              -v $(pwd):/workspace \
+              -w /workspace \
+              -e SWOOLE_VERSION="$SWOOLE_VERSION" \
+              "$IMAGE" \
+              bash -c "bash build-swoole.sh && cp /output/swoole.so /workspace/"
+          
+          # 验证生成的 swoole.so 是否存在
+          if [ ! -f "swoole.so" ]; then
+              echo "❌ Failed to generate swoole.so"
+              exit 1
+          fi
+          echo "✅ swoole.so generated successfully"
 
       - name: Upload swoole.so
         uses: actions/upload-artifact@v4
         with:
-          name: swoole-so-php-${{ matrix.php-version }}
-          path: ${{ steps.get-ext-dir.outputs.EXT_DIR }}/swoole.so
+          name: swoole-so-php-${{ matrix.php-version }}-debian10-glibc2.28
+          path: swoole.so
           retention-days: 30

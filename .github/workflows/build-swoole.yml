@@ -1,14 +1,14 @@
-name: Build Swoole Extension (Docker, source compile)
+name: Build Swoole Extension (Docker, fixed)
 
 on:
   workflow_dispatch:
     inputs:
       swoole_version:
-        description: 'Swoole 版本号 (留空则自动使用最新稳定版)'
+        description: 'Swoole 版本 (留空则使用最新稳定版)'
         required: false
         default: ''
       php_version:
-        description: 'PHP 版本 (例如 8.2)'
+        description: 'PHP 版本 (例如 8.2 或 8.5)'
         required: true
         default: '8.5'
 
@@ -17,7 +17,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        php-version: ['8.3', '8.5']
+        php-version: ['8.1', '8.2', '8.3', '8.5']
 
     steps:
       - name: Checkout code
@@ -27,13 +27,12 @@ jobs:
         run: |
           PHP_VERSION="${{ matrix.php-version }}"
           SWOOLE_VERSION="${{ github.event.inputs.swoole_version }}"
-          
           IMAGE="php:${PHP_VERSION}-cli"
-          
+
           cat > build-swoole.sh << 'EOF'
           #!/bin/bash
           set -e
-          
+
           apt-get update
           apt-get install -y --no-install-recommends \
               build-essential \
@@ -42,11 +41,11 @@ jobs:
               git \
               unzip \
               pkg-config
-          
-          # 安装 PHP 的 sockets 扩展（需要头文件）
+
+          # 关键：安装 PHP 的 sockets 扩展，提供头文件
           docker-php-ext-install sockets
-          
-          # 确定 Swoole 版本
+
+          # 获取 Swoole 版本
           if [ -n "$SWOOLE_VERSION" ]; then
               SWOOLE_TAG="v${SWOOLE_VERSION}"
           else
@@ -57,35 +56,32 @@ jobs:
                   | tail -1)
               echo "Latest tag: $SWOOLE_TAG"
           fi
-          
-          echo "Cloning Swoole $SWOOLE_TAG"
+
           git clone --branch "$SWOOLE_TAG" --single-branch --depth 1 https://github.com/swoole/swoole-src.git /tmp/swoole
           cd /tmp/swoole
-          
           phpize
           ./configure \
               --enable-openssl \
               --enable-http2 \
-              --enable-sockets \
               --enable-mysqlnd
           make -j$(nproc)
           make install
-          
+
           EXT_DIR=$(php -r "echo ini_get('extension_dir');")
           mkdir -p /output
           cp "$EXT_DIR/swoole.so" /output/
           echo "swoole.so copied to /output/"
           EOF
-          
+
           chmod +x build-swoole.sh
-          
+
           docker run --rm \
               -v $(pwd):/workspace \
               -w /workspace \
               -e SWOOLE_VERSION="$SWOOLE_VERSION" \
               "$IMAGE" \
               bash -c "bash build-swoole.sh && cp /output/swoole.so /workspace/"
-          
+
           if [ ! -f "swoole.so" ]; then
               echo "❌ Failed to generate swoole.so"
               exit 1
@@ -100,6 +96,6 @@ jobs:
       - name: Upload swoole.so
         uses: actions/upload-artifact@v4
         with:
-          name: swoole-so-php-${{ matrix.php-version }}-glibc2.36
+          name: swoole-so-php-${{ matrix.php-version }}
           path: swoole.so
           retention-days: 30

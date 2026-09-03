@@ -1,0 +1,67 @@
+name: Build Swoole Extension
+
+on:
+  # 手动触发工作流，方便你随时构建
+  workflow_dispatch:
+    inputs:
+      swoole_version:
+        description: 'Swoole 版本 (留空则安装最新版)'
+        required: false
+        default: ''
+      php_version:
+        description: 'PHP 版本'
+        required: true
+        default: '8.2'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        # 你可以在这里定义需要构建的 PHP 版本
+        php-version: ['8.5', '8.2', '8.3']
+
+    steps:
+      # 1. 检出代码 (虽然本例中未直接使用，但这是一个好习惯)
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # 2. 设置 PHP 环境
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php-version }}
+          # 关键：声明需要 swoole 扩展
+          extensions: swoole
+          tools: phpize
+        env:
+          # 通过环境变量传递 Swoole 的编译参数，例如启用 OpenSSL[reference:3]
+          SWOOLE_CONFIGURE_OPTS: --enable-openssl --enable-http2
+
+      # 3. (可选) 安装特定版本的 Swoole
+      # 如果 workflow_dispatch 中指定了 swoole_version，则安装指定版本
+      - name: Install specific Swoole version (if requested)
+        if: github.event.inputs.swoole_version != ''
+        run: |
+          pecl uninstall -r swoole
+          pecl install swoole-${{ github.event.inputs.swoole_version }}
+
+      # 4. 查找 swoole.so 文件路径
+      - name: Get extension directory
+        id: get-ext-dir
+        run: |
+          # 通过 php -i 获取扩展目录
+          EXT_DIR=$(php -i | grep extension_dir | awk '{print $3}')
+          echo "EXT_DIR=$EXT_DIR" >> $GITHUB_OUTPUT
+          echo "Swoole extension installed at: $EXT_DIR/swoole.so"
+
+      # 5. 上传 swoole.so 作为构建产物
+      - name: Upload swoole.so
+        uses: actions/upload-artifact@v4
+        with:
+          # 为产物命名，包含 PHP 版本信息以示区分
+          name: swoole-so-php-${{ matrix.php-version }}
+          # 从步骤4的输出中获取路径
+          path: ${{ steps.get-ext-dir.outputs.EXT_DIR }}/swoole.so
+          # 产物保留天数，可自行调整
+          retention-days: 30

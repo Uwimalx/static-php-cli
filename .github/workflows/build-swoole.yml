@@ -17,7 +17,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        php-version: ['8.5']
+        php-version: ['8.3', '8.5']
 
     steps:
       - name: Checkout code
@@ -28,10 +28,8 @@ jobs:
           PHP_VERSION="${{ matrix.php-version }}"
           SWOOLE_VERSION="${{ github.event.inputs.swoole_version }}"
           
-          # 使用 PHP 官方镜像（默认 Debian 12, glibc 2.36，适配目标环境）
           IMAGE="php:${PHP_VERSION}-cli"
           
-          # 创建构建脚本
           cat > build-swoole.sh << 'EOF'
           #!/bin/bash
           set -e
@@ -45,7 +43,10 @@ jobs:
               unzip \
               pkg-config
           
-          # 确定 Swoole 版本（若未指定，自动获取最新稳定版）
+          # 安装 PHP 的 sockets 扩展（需要头文件）
+          docker-php-ext-install sockets
+          
+          # 确定 Swoole 版本
           if [ -n "$SWOOLE_VERSION" ]; then
               SWOOLE_TAG="v${SWOOLE_VERSION}"
           else
@@ -61,7 +62,6 @@ jobs:
           git clone --branch "$SWOOLE_TAG" --single-branch --depth 1 https://github.com/swoole/swoole-src.git /tmp/swoole
           cd /tmp/swoole
           
-          # 编译 Swoole（显式启用需要的功能）
           phpize
           ./configure \
               --enable-openssl \
@@ -71,16 +71,14 @@ jobs:
           make -j$(nproc)
           make install
           
-          # 复制 swoole.so 到挂载卷
           EXT_DIR=$(php -r "echo ini_get('extension_dir');")
           mkdir -p /output
           cp "$EXT_DIR/swoole.so" /output/
-          echo "swoole.so installed and copied to /output/"
+          echo "swoole.so copied to /output/"
           EOF
           
           chmod +x build-swoole.sh
           
-          # 运行容器编译
           docker run --rm \
               -v $(pwd):/workspace \
               -w /workspace \
@@ -88,16 +86,15 @@ jobs:
               "$IMAGE" \
               bash -c "bash build-swoole.sh && cp /output/swoole.so /workspace/"
           
-          # 验证产物
           if [ ! -f "swoole.so" ]; then
               echo "❌ Failed to generate swoole.so"
               exit 1
           fi
           echo "✅ swoole.so generated successfully"
 
-      - name: Check glibc dependency (optional)
+      - name: Check glibc dependency
         run: |
-          echo "Highest GLIBC version required by swoole.so:"
+          echo "Highest GLIBC version required:"
           objdump -T swoole.so | grep GLIBC_ | sed 's/.*GLIBC_\([0-9.]*\).*/\1/g' | sort -uV | tail -1
 
       - name: Upload swoole.so
